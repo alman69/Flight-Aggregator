@@ -1,6 +1,6 @@
 # Flight Aggregator
 
-A personal flight-search tool that runs only on your Mac. You give it a travel window, and it
+A personal flight-search tool that runs only on your local device. You give it a travel window, and it
 lists every valid departure/return date combination. Each combination gets links to eight flight
 providers with the dates filled in where the provider allows it. Prices only appear when an
 authorized source has actually observed them, and each one is labeled with where it came from.
