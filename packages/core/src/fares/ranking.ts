@@ -80,7 +80,15 @@ export function rankCells<C extends DateCombo>(
       result.withoutData.push(cell);
       continue;
     }
-    const sameCurrency = cell.offers.filter((o) => o.price.currency === options.currency);
+    const regular = cell.offers.filter((o) => o.itineraryKind !== 'hidden_city');
+    if (regular.length === 0) {
+      result.unscored.push({
+        cell,
+        reason: 'Hidden-city fares only (never ranked against regular fares)',
+      });
+      continue;
+    }
+    const sameCurrency = regular.filter((o) => o.price.currency === options.currency);
     if (sameCurrency.length === 0) {
       result.unscored.push({ cell, reason: `Priced in a currency other than ${options.currency}` });
       continue;

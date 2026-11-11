@@ -9,7 +9,8 @@ import {
 } from '@flight/core';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { renderWithQuery, stubApi } from '../test/render';
 import { ComboDrawer } from './ComboDrawer';
 import { PriceMatrix } from './PriceMatrix';
 import { RankedList } from './RankedList';
@@ -157,7 +158,15 @@ describe('ComboDrawer', () => {
   it('lists all eight providers and gates Skiplagged behind the hidden-city warning', async () => {
     const user = userEvent.setup();
     const open = vi.spyOn(window, 'open').mockImplementation(() => null);
-    render(<ComboDrawer cell={noData[0]!} query={query} lowestKey={null} onClose={() => {}} />);
+    renderWithQuery(
+      <ComboDrawer
+        cell={noData[0]!}
+        query={query}
+        lowestKey={null}
+        demo={false}
+        onClose={() => {}}
+      />,
+    );
     const links = screen.getAllByRole('link');
     expect(links).toHaveLength(7);
     expect(links[0]).toHaveAttribute('href', expect.stringContaining('google.com/travel/flights'));
@@ -176,11 +185,14 @@ describe('ComboDrawer', () => {
   });
 });
 
+afterEach(() => vi.unstubAllGlobals());
+
 describe('SearchForm', () => {
   it('previews the number of combinations before searching', async () => {
     const user = userEvent.setup();
     const onSearch = vi.fn();
-    render(<SearchForm initialQuery={null} onSearch={onSearch} />);
+    stubApi({});
+    renderWithQuery(<SearchForm initialQuery={null} onSearch={onSearch} />);
     await user.type(screen.getByLabelText('To'), 'tyo');
     await user.clear(screen.getByLabelText('Earliest departure'));
     await user.type(screen.getByLabelText('Earliest departure'), '2027-11-01');
@@ -203,9 +215,10 @@ describe('SearchForm', () => {
   it('does not search when the destination is missing', async () => {
     const user = userEvent.setup();
     const onSearch = vi.fn();
-    render(<SearchForm initialQuery={null} onSearch={onSearch} />);
+    stubApi({});
+    renderWithQuery(<SearchForm initialQuery={null} onSearch={onSearch} />);
     await user.click(screen.getByRole('button', { name: 'Search' }));
     expect(onSearch).not.toHaveBeenCalled();
-    expect(screen.getByText(/3-letter airport or city code/)).toBeInTheDocument();
+    expect(screen.getByText(/Choose an airport from the list/)).toBeInTheDocument();
   });
 });

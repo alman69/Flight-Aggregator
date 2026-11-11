@@ -56,7 +56,7 @@ export function CoverageSummary({ summary, demo }: { summary: Summary; demo: boo
         {demo
           ? 'Demo mode: gaps are deliberate, to show how missing data looks.'
           : summary.observed === 0 && summary.notQueried === summary.total
-            ? 'No price source is connected yet, so nothing has been searched. Open any date to check it on the providers below; real cached prices arrive in a later milestone.'
+            ? 'No prices recorded for these dates yet. Open any date to check it on the providers and save what you find; cached prices arrive in a later milestone.'
             : 'A missing price means none was observed. It does not mean there are no flights.'}
       </p>
     </section>

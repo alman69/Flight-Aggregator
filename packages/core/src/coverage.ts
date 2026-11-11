@@ -18,7 +18,7 @@ export interface ComboCell<C extends DateCombo = DateCombo> {
   combo: C;
   status: CellStatus;
   offers: FareOffer[];
-  /** Cheapest offer in the display currency, or null if there is none. */
+  /** Cheapest regular (non-hidden-city) offer in the display currency, or null if there is none. */
   lowest: FareOffer | null;
   failureReason: string | null;
 }
@@ -36,10 +36,14 @@ export interface BuildCellsOptions {
   overrides?: ReadonlyMap<string, CellOverride>;
 }
 
+/**
+ * Cheapest regular fare in the display currency. Hidden-city fares are never picked: they are not
+ * equivalent to regular itineraries and must not be compared with them.
+ */
 export function lowestOffer(offers: readonly FareOffer[], currency: string): FareOffer | null {
   let best: FareOffer | null = null;
   for (const offer of offers) {
-    if (offer.price.currency !== currency) continue;
+    if (offer.price.currency !== currency || offer.itineraryKind === 'hidden_city') continue;
     if (!best || offer.price.amountMinor < best.price.amountMinor) best = offer;
   }
   return best;

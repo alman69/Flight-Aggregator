@@ -1,70 +1,42 @@
+import { todayLocal } from '@flight/core';
 import express, { type ErrorRequestHandler } from 'express';
-import {
-  type InvalidRequestResponse,
-  type SearchPlanResponse,
-  SearchQuerySchema,
-  buildProviderLinks,
-  planSearch,
-  todayLocal,
-} from '@flight/core';
+import type { Database } from './db/connection';
+import { createAirportsRepo } from './db/repos/airports';
+import { createObservationsRepo } from './db/repos/observations';
+import { airportRoutes } from './routes/airports';
+import { observationRoutes } from './routes/observations';
+import { providerRoutes } from './routes/providers';
+import { searchRoutes } from './routes/search';
 
 export interface AppOptions {
+  db: Database;
   /** Supplies "today" (YYYY-MM-DD). Tests pass a fixed date. */
   today?: () => string;
 }
 
 /** Builds the Express app without starting it, so tests can call it directly. */
-export function createApp(options: AppOptions = {}) {
+export function createApp(options: AppOptions) {
   const today = options.today ?? (() => todayLocal());
+  const airports = createAirportsRepo(options.db);
+  const observations = createObservationsRepo(options.db);
+
   const app = express();
   app.disable('x-powered-by');
   app.use(express.json({ limit: '32kb' }));
 
   app.get('/api/health', (_req, res) => {
-    res.json({ ok: true, service: 'flight-aggregator', milestone: 1, today: today() });
+    res.json({
+      ok: true,
+      service: 'flight-aggregator',
+      milestone: 2,
+      today: today(),
+      airports: airports.count(),
+    });
   });
-
-  /**
-   * Validates a search and lists its date combinations with provider links.
-   * Makes no external requests. 400 = malformed body, 422 = valid shape but the search
-   * cannot run (the body still explains why), 200 = ready.
-   */
-  app.post('/api/search/plan', (req, res) => {
-    const parsed = SearchQuerySchema.safeParse(req.body);
-    if (!parsed.success) {
-      const body: InvalidRequestResponse = {
-        error: 'invalid_request',
-        details: parsed.error.issues.map((issue) => ({
-          path: issue.path.join('.'),
-          message: issue.message,
-        })),
-      };
-      res.status(400).json(body);
-      return;
-    }
-
-    const query = parsed.data;
-    const now = today();
-    const plan = planSearch(query, now);
-    const body: SearchPlanResponse = {
-      ...plan,
-      combos: plan.combos.map((combo) => ({
-        ...combo,
-        links: buildProviderLinks({
-          origin: query.origin,
-          destination: query.destination,
-          departDate: combo.departDate,
-          returnDate: combo.returnDate,
-          adults: query.adults,
-          cabin: query.cabin,
-        }),
-      })),
-      query,
-      today: now,
-      generatedAt: new Date().toISOString(),
-    };
-    res.status(plan.ok ? 200 : 422).json(body);
-  });
+  app.use('/api', searchRoutes({ today, observations }));
+  app.use('/api', airportRoutes({ airports }));
+  app.use('/api', providerRoutes());
+  app.use('/api', observationRoutes({ observations }));
 
   app.use('/api', (_req, res) => {
     res.status(404).json({ error: 'not_found' });

@@ -2,8 +2,9 @@ import request from 'supertest';
 import { describe, expect, it } from 'vitest';
 import type { SearchPlanResponse } from '@flight/core';
 import { createApp } from './app';
+import { openDatabase } from './db/connection';
 
-const app = createApp({ today: () => '2026-11-11' });
+const app = createApp({ db: openDatabase(':memory:'), today: () => '2026-11-11' });
 
 const search = {
   tripType: 'round_trip',
@@ -16,7 +17,7 @@ describe('GET /api/health', () => {
   it('reports the service is up', async () => {
     const res = await request(app).get('/api/health');
     expect(res.status).toBe(200);
-    expect(res.body).toMatchObject({ ok: true, milestone: 1, today: '2026-11-11' });
+    expect(res.body).toMatchObject({ ok: true, milestone: 2, today: '2026-11-11' });
   });
 });
 

@@ -1,7 +1,6 @@
 import {
   CABIN_LABELS,
   type Cabin,
-  CITY_CODES,
   type SearchQuery,
   SearchQuerySchema,
   planSearch,
@@ -16,6 +15,7 @@ import {
   formToInput,
   queryToForm,
 } from '../lib/searchForm';
+import { AirportInput } from './AirportInput';
 import { Field, Segmented, inputBase, inputClass } from './Field';
 import { SwapIcon } from './Icons';
 import { IssueList } from './IssueList';
@@ -111,32 +111,18 @@ export function SearchForm({
     </Field>
   );
 
-  const codeInput = (key: 'origin' | 'destination', label: string, placeholder: string) => {
-    const value = form[key].trim().toUpperCase();
-    return (
-      <Field
-        label={label}
-        htmlFor={key}
-        error={showError(key)}
-        hint={CITY_CODES[value] ?? 'Airport or city code'}
-        className="min-w-0 flex-1"
-      >
-        <input
-          id={key}
-          className={`${inputClass} font-mono text-base tracking-widest uppercase`}
-          value={form[key]}
-          maxLength={3}
-          placeholder={placeholder}
-          autoComplete="off"
-          spellCheck={false}
-          onChange={(e) => set(key, e.target.value.toUpperCase())}
-          onBlur={() => touch(key)}
-          aria-invalid={Boolean(showError(key))}
-          aria-describedby={showError(key) ? `${key}-error` : undefined}
-        />
-      </Field>
-    );
-  };
+  const codeInput = (key: 'origin' | 'destination', label: string, placeholder: string) => (
+    <AirportInput
+      id={key}
+      label={label}
+      value={form[key]}
+      placeholder={placeholder}
+      error={showError(key)}
+      align={key === 'origin' ? 'left' : 'right'}
+      onChange={(v) => set(key, v)}
+      onBlur={() => touch(key)}
+    />
+  );
 
   return (
     <form

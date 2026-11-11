@@ -27,8 +27,11 @@ export function describeCell(cell: Cell): string {
   if (cell.hiddenByFilter) return `${dates}: hidden by filters`;
   switch (cell.status) {
     case 'observed':
-      return cell.lowest
-        ? `${dates}: lowest observed fare ${formatMoney(cell.lowest.price)} (${cell.lowest.status})`
+      if (cell.lowest) {
+        return `${dates}: lowest observed fare ${formatMoney(cell.lowest.price)} (${cell.lowest.status})`;
+      }
+      return cell.offers.every((o) => o.itineraryKind === 'hidden_city')
+        ? `${dates}: only hidden-city fares observed (not compared with regular fares)`
         : `${dates}: fares observed in another currency`;
     case 'no_observation':
       return `${dates}: no fare observed. This does not mean no flights exist.`;
@@ -45,7 +48,14 @@ function CellContent({ cell, isLowest }: { cell: Cell; isLowest: boolean }) {
   if (cell.hiddenByFilter) return <span className="text-xs text-slate-400">Filtered</span>;
   switch (cell.status) {
     case 'observed':
-      if (!cell.lowest) return <span className="text-xs text-slate-500">Other currency</span>;
+      if (!cell.lowest) {
+        const hiddenOnly = cell.offers.every((o) => o.itineraryKind === 'hidden_city');
+        return (
+          <span className="text-xs text-slate-500">
+            {hiddenOnly ? 'Hidden-city only' : 'Other currency'}
+          </span>
+        );
+      }
       return (
         <span className="flex flex-col items-center gap-0.5">
           <span className="text-sm font-semibold tabular-nums">

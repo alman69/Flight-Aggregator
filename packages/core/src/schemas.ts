@@ -10,7 +10,7 @@ export const IataSchema = z
   .string()
   .trim()
   .toUpperCase()
-  .regex(/^[A-Z]{3}$/, 'Expected a 3-letter airport or city code, e.g. BUF');
+  .regex(/^[A-Z]{3}$/, 'Choose an airport from the list or type its 3-letter code');
 
 export const DateRangeSchema = z.object({ start: IsoDateSchema, end: IsoDateSchema });
 

@@ -1,10 +1,34 @@
+import { existsSync, readFileSync } from 'node:fs';
 import { createApp } from './app';
+import { parseAirportSeed } from './airports/ourAirports';
+import { config } from './config';
+import { openDatabase } from './db/connection';
+import { createAirportsRepo } from './db/repos/airports';
 
-// Bind to the loopback interface only: this API is for this Mac, not the network.
-const HOST = '127.0.0.1';
-// API_PORT (not PORT) so tools that set PORT for the web dev server do not move the API.
-const PORT = Number(process.env.API_PORT ?? 5174);
+const db = openDatabase(config.dbPath);
 
-createApp().listen(PORT, HOST, () => {
-  console.log(`Flight Aggregator API listening on http://${HOST}:${PORT}`);
+// Load the committed OurAirports extract the first time the database is created.
+const airports = createAirportsRepo(db);
+if (airports.count() === 0) {
+  if (existsSync(config.airportSeedPath)) {
+    const rows = parseAirportSeed(readFileSync(config.airportSeedPath, 'utf8'));
+    airports.replaceAll(rows);
+    console.log(`Loaded ${rows.length} airports into the database.`);
+  } else {
+    console.warn('No airport seed found; run `npm run airports:update` to enable autocomplete.');
+  }
+}
+
+const server = createApp({ db }).listen(config.port, config.host, () => {
+  console.log(`Flight Aggregator API listening on http://${config.host}:${config.port}`);
+  console.log(`Database: ${config.dbPath}`);
 });
+
+// Close the database cleanly when stopped (Ctrl+C or tsx watch restarts).
+for (const signal of ['SIGINT', 'SIGTERM'] as const) {
+  process.on(signal, () => {
+    server.close();
+    db.close();
+    process.exit(0);
+  });
+}

@@ -15,10 +15,11 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "build": "npm run build -w @flight/web"
+    "build": "npm run build -w @flight/web",
+    "airports:update": "npm run airports:update -w @flight/server --"
   },
   "engines": {
-    "node": ">=20.19"
+    "node": ">=22.13"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

@@ -9,7 +9,7 @@ import {
 } from '@flight/core';
 import { useQuery } from '@tanstack/react-query';
 import { useCallback, useMemo, useState } from 'react';
-import { fetchPlan } from '../api/client';
+import { fetchSearch } from '../api/client';
 import { generateDemoOffers } from '../demo/demoOffers';
 import { formatDate, nightsLabel } from '../lib/format';
 import { ComboDrawer } from './ComboDrawer';
@@ -18,6 +18,7 @@ import { FiltersBar } from './FiltersBar';
 import { GridIcon, ListIcon } from './Icons';
 import { IssueList } from './IssueList';
 import { MatrixLegend, PriceMatrix } from './PriceMatrix';
+import { ProvidersPanel } from './ProvidersPanel';
 import { RankedList } from './RankedList';
 import { Segmented } from './Field';
 
@@ -26,8 +27,8 @@ type View = 'matrix' | 'list';
 
 export function Results({ query, demo }: { query: SearchQuery; demo: boolean }) {
   const planQuery = useQuery({
-    queryKey: ['plan', query],
-    queryFn: ({ signal }) => fetchPlan(query, signal),
+    queryKey: ['search', query],
+    queryFn: ({ signal }) => fetchSearch(query, signal),
   });
 
   const [view, setView] = useState<View>('matrix');
@@ -41,7 +42,10 @@ export function Results({ query, demo }: { query: SearchQuery; demo: boolean }) 
   const cells = useMemo(() => {
     if (!plan?.ok) return [];
     // Demo prices are generated here in the browser, only when ?demo=1, and never stored.
-    const offers = demo ? generateDemoOffers(plan.combos, plan.query, plan.generatedAt) : [];
+    // Real and demo data are never mixed: demo mode shows demo prices only.
+    const offers = demo
+      ? generateDemoOffers(plan.combos, plan.query, plan.generatedAt)
+      : plan.offers;
     return buildCells(plan.combos, offers, {
       currency: CURRENCY,
       defaultStatus: demo ? 'no_observation' : 'not_queried',
@@ -173,9 +177,12 @@ export function Results({ query, demo }: { query: SearchQuery; demo: boolean }) 
           cell={selected}
           query={plan!.query}
           lowestKey={lowest?.combo.key ?? null}
+          demo={demo}
           onClose={closeDrawer}
         />
       )}
+
+      <ProvidersPanel sources={plan!.sources} demo={demo} />
     </div>
   );
 }

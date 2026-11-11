@@ -7,7 +7,7 @@ const LABELS = [
   {
     tag: 'Manual',
     className: 'bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-200',
-    text: 'A price you saw on a provider and saved yourself. Arrives in Milestone 2.',
+    text: 'A price you saw on a provider and saved yourself. Open any date in the results and choose “Add a price I saw”. Stored only on this Mac.',
   },
   {
     tag: 'Links',

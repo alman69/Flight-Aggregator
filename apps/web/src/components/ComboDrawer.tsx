@@ -10,10 +10,13 @@ import {
   formatMoney,
   groupComparabilityIssues,
 } from '@flight/core';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
+import { deleteObservation } from '../api/client';
 import { formatDateLong, formatMinutes, nightsLabel, stopsLabel } from '../lib/format';
-import { HiddenCityDialog } from './HiddenCityDialog';
+import { HIDDEN_CITY_RISKS, HiddenCityDialog } from './HiddenCityDialog';
 import { AlertIcon, CloseIcon, ExternalIcon } from './Icons';
+import { ManualPriceForm } from './ManualPriceForm';
 import { StatusTag } from './StatusTag';
 
 const STATUS_EXPLANATION: Record<ComboCell['status'], string> = {
@@ -21,7 +24,7 @@ const STATUS_EXPLANATION: Record<ComboCell['status'], string> = {
   no_observation:
     'No fare was observed for these dates. That does not mean there are no flights — check the providers below.',
   not_queried:
-    'These dates have not been searched for prices, because no price source is connected yet. Check them on the providers below.',
+    'No price has been recorded for these dates yet. Check them on the providers below, then add what you find.',
   query_failed: 'Searching for prices failed for these dates.',
   loading: 'Searching…',
 };
@@ -37,8 +40,46 @@ function Detail({ label, value }: { label: string; value: string }) {
 
 const NOT_PROVIDED = 'Not provided by source';
 
+function RemoveButton({ id }: { id: string }) {
+  const queryClient = useQueryClient();
+  const [confirming, setConfirming] = useState(false);
+  const remove = useMutation({
+    mutationFn: () => deleteObservation(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['search'] }),
+  });
+  if (remove.isError) return <span className="text-xs text-rose-600">{remove.error.message}</span>;
+  return confirming ? (
+    <span className="flex items-center gap-2 text-xs">
+      <button
+        type="button"
+        onClick={() => remove.mutate()}
+        disabled={remove.isPending}
+        className="font-semibold text-rose-700 hover:underline dark:text-rose-400"
+      >
+        {remove.isPending ? 'Removing…' : 'Confirm remove'}
+      </button>
+      <button
+        type="button"
+        onClick={() => setConfirming(false)}
+        className="text-slate-500 hover:underline"
+      >
+        Keep
+      </button>
+    </span>
+  ) : (
+    <button
+      type="button"
+      onClick={() => setConfirming(true)}
+      className="text-xs text-slate-500 hover:text-rose-700 hover:underline"
+    >
+      Remove
+    </button>
+  );
+}
+
 function OfferCard({ offer, isLowest }: { offer: FareOffer; isLowest: boolean }) {
   const freshness = describeFreshness(offer);
+  const hiddenCity = offer.itineraryKind === 'hidden_city';
   const value = bestValueScore(offer);
   const stops = (n: number | null) => (n === null ? NOT_PROVIDED : stopsLabel(n));
   return (
@@ -59,6 +100,11 @@ function OfferCard({ offer, isLowest }: { offer: FareOffer; isLowest: boolean })
         </div>
         <div className="flex flex-col items-end gap-1">
           <StatusTag status={offer.status} />
+          {hiddenCity && (
+            <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-amber-900 uppercase dark:bg-amber-950 dark:text-amber-200">
+              Hidden city
+            </span>
+          )}
           {isLowest && (
             <span className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-300">
               Lowest observed fare
@@ -119,6 +165,35 @@ function OfferCard({ offer, isLowest }: { offer: FareOffer; isLowest: boolean })
           {note}
         </p>
       ))}
+      {hiddenCity && (
+        <details className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+          <summary className="cursor-pointer font-semibold">
+            Hidden-city fare: not compared with regular fares
+          </summary>
+          <ul className="mt-2 list-disc space-y-1 pl-4">
+            {HIDDEN_CITY_RISKS.map((risk) => (
+              <li key={risk}>{risk}</li>
+            ))}
+          </ul>
+        </details>
+      )}
+      {(offer.bookingUrl || offer.status === 'manual') && (
+        <footer className="mt-3 flex items-center justify-between gap-3">
+          {offer.bookingUrl ? (
+            <a
+              href={offer.bookingUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-xs font-medium text-sky-700 hover:underline dark:text-sky-400"
+            >
+              Open listing <ExternalIcon />
+            </a>
+          ) : (
+            <span />
+          )}
+          {offer.status === 'manual' && <RemoveButton id={offer.id} />}
+        </footer>
+      )}
     </article>
   );
 }
@@ -191,20 +266,25 @@ export function ComboDrawer({
   cell,
   query,
   lowestKey,
+  demo,
   onClose,
 }: {
   cell: ComboCell<PlannedCombo>;
   query: SearchQuery;
   lowestKey: string | null;
+  /** In demo mode real prices can't be added, so demo and real data never mix. */
+  demo: boolean;
   onClose: () => void;
 }) {
   const closeRef = useRef<HTMLButtonElement>(null);
+  const [adding, setAdding] = useState(false);
   const { combo } = cell;
   const offers = [...cell.offers].sort((a, b) => a.price.amountMinor - b.price.amountMinor);
   const comparability = groupComparabilityIssues(offers);
 
   useEffect(() => {
     closeRef.current?.focus();
+    setAdding(false);
   }, [combo.key]);
 
   useEffect(() => {
@@ -260,15 +340,32 @@ export function ComboDrawer({
             )}
             {offers.length > 0 && (
               <div className="mt-3 space-y-3">
-                {offers.map((offer, i) => (
+                {offers.map((offer) => (
                   <OfferCard
                     key={offer.id}
                     offer={offer}
-                    isLowest={i === 0 && combo.key === lowestKey}
+                    isLowest={combo.key === lowestKey && offer.id === cell.lowest?.id}
                   />
                 ))}
               </div>
             )}
+            <div className="mt-4">
+              {demo ? (
+                <p className="text-xs text-slate-500">
+                  Exit demo mode to record prices you've seen.
+                </p>
+              ) : adding ? (
+                <ManualPriceForm combo={combo} query={query} onDone={() => setAdding(false)} />
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setAdding(true)}
+                  className="w-full rounded-lg border border-dashed border-violet-300 px-3 py-2 text-sm font-medium text-violet-700 transition hover:bg-violet-50 dark:border-violet-800 dark:text-violet-300 dark:hover:bg-violet-950/40"
+                >
+                  + Add a price I saw
+                </button>
+              )}
+            </div>
           </section>
 
           <section aria-labelledby="providers-title">
